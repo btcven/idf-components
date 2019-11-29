@@ -1,5 +1,6 @@
 build/
 sdkconfig.old
+.vscode
 *.code-workspace
 .DS_Store
 
