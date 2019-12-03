@@ -26,11 +26,12 @@ gpio_num_t sda_pin = GPIO_NUM_23;
 gpio_num_t scl_pin = GPIO_NUM_22;
 gpio_pullup_t sda_pullup = GPIO_PULLUP_DISABLE;
 gpio_pullup_t scl_pullup = GPIO_PULLUP_DISABLE;
+
 uint32_t i2c_frequency = 100000;
 
-uint32_t ticksToWait = 0;
+uint32_t ticksToWait = 10;
 
-static esp_err_t i2c_init(void)
+esp_err_t i2c_init(void)
 {
     i2c_port_t i2c_master_port = i2c_port;
     // **
@@ -56,7 +57,7 @@ static esp_err_t i2c_init(void)
     }
     return err;
 }
-static esp_err_t i2c_delete(void)
+esp_err_t i2c_delete(void)
 {
     i2c_port_t i2c_master_port = i2c_port;
     esp_err_t res = i2c_driver_delete(i2c_master_port);
@@ -102,38 +103,43 @@ uint16_t readWord(uint8_t command, int32_t timeout)
     uint8_t data[2];
 
     res = i2c_init();
-    res = i2c_set_timeout(i2c_port, 14800);
-
-    if (res != ESP_OK) {
-        ESP_LOGE(__func__, "\t i2c set timeout [ERROR] %s", esp_err_to_name(res));
-        return res;
+    if (res == ESP_OK) {
+        res = i2c_set_timeout(i2c_port, 14000);
     }
 
     i2c_cmd_handle_t cmd = i2c_cmd_link_create();
     // i2c start
-    i2c_master_start(cmd);
+    res = i2c_master_start(cmd);
+    if (res != ESP_OK) {
+        return 0;
+    }
     // Select the slave by address
     i2c_master_write_byte(cmd, (0x55 << 1) | I2C_MASTER_WRITE, true);
-    i2c_master_write_byte(cmd, command, false);
+    i2c_master_write_byte(cmd, command, true);
     //
     //
     // > Start read CMD or delay before to read
-    //i2c_master_start(cmd);
+    i2c_master_start(cmd);
     // Select the slave by addr
     i2c_master_write_byte(cmd, (0x55 << 1) | I2C_MASTER_READ, true);
     // Read data from slave
-    i2c_master_read(cmd, data, 2, I2C_MASTER_ACK);
+    // i2c_master_read_byte(cmd, &data[0], I2C_MASTER_NACK);
+    // i2c_master_read_byte(cmd, &data[1], I2C_MASTER_NACK);
+
+    i2c_master_read(cmd, data, 2, I2C_MASTER_LAST_NACK);
     // > End read
     //
     // Stop transaction
     i2c_master_stop(cmd);
     // Begin transaction
-    res = i2c_master_cmd_begin(i2c_port, cmd, timeout / portTICK_PERIOD_MS);
+    res = i2c_master_cmd_begin(i2c_port, cmd, (timeout < 0 ? ticksToWait : pdMS_TO_TICKS(timeout)));
     if (res != ESP_OK) {
         ESP_LOGE(__func__, "\t i2c_master_cmd_begin -- [ERROR] %s", esp_err_to_name(res));
     }
 
     i2c_delete();
+
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
 
     return (data[1] << 8) | data[0];
 }
@@ -153,7 +159,7 @@ if (res != ESP_OK) {
 
 void voltage(void)
 {
-    int16_t self = readWord(0x04, 2500);
+    int16_t self = readWord(0x04, 2000);
     printf("Voltage: ");
     printf("%d mV\n", self);
 }
