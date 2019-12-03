@@ -90,12 +90,6 @@ void i2c_detect(void)
     }
 }
 
-uint8_t readByte(uint8_t command, int32_t timeout)
-{
-    // ToDo
-    return 0;
-}
-
 uint16_t readWord(uint8_t command, int32_t timeout)
 {
     uint8_t data[2];
