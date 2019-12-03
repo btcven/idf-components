@@ -98,64 +98,38 @@ uint8_t readByte(uint8_t command, int32_t timeout)
 
 uint16_t readWord(uint8_t command, int32_t timeout)
 {
-    esp_err_t res;
-
     uint8_t data[2];
 
-    res = i2c_init();
-    if (res == ESP_OK) {
-        res = i2c_set_timeout(i2c_port, 14000);
-    }
+    // init i2c interface
+    i2c_init();
+    // set timeout
+    i2c_set_timeout(i2c_port, 14000);
 
     i2c_cmd_handle_t cmd = i2c_cmd_link_create();
     // i2c start
-    res = i2c_master_start(cmd);
-    if (res != ESP_OK) {
-        return 0;
-    }
+    i2c_master_start(cmd);
     // Select the slave by address
     i2c_master_write_byte(cmd, (0x55 << 1) | I2C_MASTER_WRITE, true);
     i2c_master_write_byte(cmd, command, true);
     //
-    //
-    // > Start read CMD or delay before to read
+    // Start read
     i2c_master_start(cmd);
     // Select the slave by addr
     i2c_master_write_byte(cmd, (0x55 << 1) | I2C_MASTER_READ, true);
     // Read data from slave
-    // i2c_master_read_byte(cmd, &data[0], I2C_MASTER_NACK);
-    // i2c_master_read_byte(cmd, &data[1], I2C_MASTER_NACK);
-
     i2c_master_read(cmd, data, 2, I2C_MASTER_LAST_NACK);
-    // > End read
-    //
     // Stop transaction
     i2c_master_stop(cmd);
     // Begin transaction
-    res = i2c_master_cmd_begin(i2c_port, cmd, (timeout < 0 ? ticksToWait : pdMS_TO_TICKS(timeout)));
+    esp_err_t res = i2c_master_cmd_begin(i2c_port, cmd, (timeout < 0 ? ticksToWait : pdMS_TO_TICKS(timeout)));
     if (res != ESP_OK) {
         ESP_LOGE(__func__, "\t i2c_master_cmd_begin -- [ERROR] %s", esp_err_to_name(res));
     }
-
+    // i2c driver delete
     i2c_delete();
-
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
 
     return (data[1] << 8) | data[0];
 }
-
-/*
-
-res = i2c_master_read_byte(cmd, &byte_0, I2C_MASTER_ACK);
-if (res != ESP_OK) {
-    ESP_LOGE(__func__, "\t i2c_master_read -- [ERROR] %s", esp_err_to_name(res));
-}
-
-res = i2c_master_read_byte(cmd, &byte_1, I2C_MASTER_ACK);
-if (res != ESP_OK) {
-    ESP_LOGE(__func__, "\t i2c_master_read -- [ERROR] %s", esp_err_to_name(res));
-}
-*/
 
 void voltage(void)
 {
